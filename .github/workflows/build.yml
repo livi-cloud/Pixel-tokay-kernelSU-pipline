@@ -1,0 +1,88 @@
+name: Build Pixel 9 KernelSU
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 360
+
+    steps:
+    - name: Install dependencies
+      run: |
+        sudo apt update
+        sudo apt install -y git bc bison flex libssl-dev \
+          libelf-dev python3 python-is-python3 make \
+          gcc-aarch64-linux-gnu repo
+
+    - name: Cache kernel source
+      uses: actions/cache@v4
+      id: cache-source
+      with:
+        path: kernel_src
+        key: kernel-src-tokay-android14-8d713f9e8e7b
+
+    - name: Sync kernel source
+      if: steps.cache-source.outputs.cache-hit != 'true'
+      run: |
+        mkdir -p kernel_src && cd kernel_src
+        repo init \
+          -u https://android.googlesource.com/kernel/manifest \
+          -b android-gs-tokay-6.1-android14 \
+          --depth=1
+        repo sync -j$(nproc) --no-tags
+
+    - name: Checkout exact commit
+      if: steps.cache-source.outputs.cache-hit != 'true'
+      run: |
+        cd kernel_src/common
+        git checkout 8d713f9e8e7b
+
+    - name: Integrate KernelSU v3.2.0
+      run: |
+        cd kernel_src/common
+        curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/setup.sh" \
+          | bash -s v3.2.0
+
+    - name: Apply kernel config
+      run: |
+        cd kernel_src/common
+        ./scripts/config --enable CONFIG_USER_NS
+        ./scripts/config --enable CONFIG_PID_NS
+        ./scripts/config --enable CONFIG_NET_NS
+        ./scripts/config --enable CONFIG_MNT_NS
+        ./scripts/config --enable CONFIG_IPC_NS
+        ./scripts/config --enable CONFIG_UTS_NS
+        ./scripts/config --enable CONFIG_CGROUPS
+        ./scripts/config --enable CONFIG_CGROUP_FREEZER
+        ./scripts/config --enable CONFIG_MEMCG
+        ./scripts/config --enable CONFIG_FHANDLE
+        ./scripts/config --enable CONFIG_SECCOMP
+
+    - name: Cache Bazel
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cache/bazel
+          kernel_src/.bazel-cache
+        key: bazel-${{ runner.os }}-${{ github.sha }}
+        restore-keys: |
+          bazel-${{ runner.os }}-
+
+    - name: Build kernel
+      run: |
+        cd kernel_src
+        tools/bazel run \
+          //common-modules/virtual-device:tokay_dist \
+          --config=fast \
+          --disk_cache=.bazel-cache
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: pixel9-kernelsu-${{ github.sha }}
+        path: kernel_src/out/tokay/dist/boot.img
+        retention-days: 7
