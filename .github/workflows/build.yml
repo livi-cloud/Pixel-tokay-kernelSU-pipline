@@ -11,6 +11,17 @@ jobs:
     timeout-minutes: 360
 
     steps:
+    - name: Maximize build space
+      uses: easimon/maximize-build-space@master
+      with:
+        root-reserve-mb: 8192
+        temp-reserve-mb: 2048
+        swap-size-mb: 8192
+        remove-dotnet: 'true'
+        remove-android: 'true'
+        remove-haskell: 'true'
+        remove-codeql: 'true'
+
     - name: Install dependencies
       run: |
         sudo apt update
@@ -23,7 +34,7 @@ jobs:
       id: cache-source
       with:
         path: kernel_src
-        key: kernel-src-tokay-android14-8d713f9e8e7b
+        key: kernel-src-caimito-android16-8d713f9e8e7b
 
     - name: Sync kernel source
       if: steps.cache-source.outputs.cache-hit != 'true'
@@ -31,7 +42,7 @@ jobs:
         mkdir -p kernel_src && cd kernel_src
         repo init \
           -u https://android.googlesource.com/kernel/manifest \
-          -b android-gs-tokay-6.1-android14 \
+          -b android-gs-caimito-6.1-android16 \
           --depth=1
         repo sync -j$(nproc) --no-tags
 
@@ -76,7 +87,7 @@ jobs:
       run: |
         cd kernel_src
         tools/bazel run \
-          //common-modules/virtual-device:tokay_dist \
+          //common-modules/virtual-device:caimito_dist \
           --config=fast \
           --disk_cache=.bazel-cache
 
@@ -84,5 +95,5 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: pixel9-kernelsu-${{ github.sha }}
-        path: kernel_src/out/tokay/dist/boot.img
+        path: kernel_src/out/caimito/dist/boot.img
         retention-days: 7
