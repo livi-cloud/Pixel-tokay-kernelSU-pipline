@@ -46,49 +46,22 @@ jobs:
 
     - name: Integrate KernelSU v3.2.0
       run: |
-        cd kernel_src/aosp
-
-        # 克隆为完整 git 仓库（不用 --depth=1），保留 git 历史以便生成版本号
-        git clone --branch v3.2.0 \
-          https://github.com/tiann/KernelSU.git \
-          /tmp/KernelSU
-
-        # 直接复制源码到 drivers/kernelsu（不用软链接，避免 modpost 符号问题）
-        cp -r /tmp/KernelSU/kernel drivers/kernelsu
-
-        # 接入内核 Kconfig 和 Makefile
-        grep -qxF 'source "drivers/kernelsu/Kconfig"' drivers/Kconfig \
-          || echo 'source "drivers/kernelsu/Kconfig"' >> drivers/Kconfig
-        grep -qxF 'obj-$(CONFIG_KSU) += kernelsu/' drivers/Makefile \
-          || echo 'obj-$(CONFIG_KSU) += kernelsu/' >> drivers/Makefile
-
-        # 在 drivers/kernelsu 目录内建立 git 仓库，确保 KSU_GIT_VERSION 可用
-        cd drivers/kernelsu
-        git init
-        git add -A
-        git -c user.email="ci@build" -c user.name="CI" \
-          commit -m "KernelSU v3.2.0" --quiet
-        git tag v3.2.0
+            cd kernel_src/aosp
+            git clone --branch v3.2.0 \
+              https://github.com/tiann/KernelSU.git \
+              /tmp/KernelSU
+            cp -r /tmp/KernelSU/kernel drivers/kernelsu
+            grep -qxF 'source "drivers/kernelsu/Kconfig"' drivers/Kconfig \
+              || echo 'source "drivers/kernelsu/Kconfig"' >> drivers/Kconfig
+            grep -qxF 'obj-$(CONFIG_KSU) += kernelsu/' drivers/Makefile \
+              || echo 'obj-$(CONFIG_KSU) += kernelsu/' >> drivers/Makefile
+            sed -i '1i ccflags-y += -DKSU_VERSION=11956' drivers/kernelsu/Makefile
 
     - name: Apply kernel config
       run: |
         cd kernel_src/aosp
         CONFIG=arch/arm64/configs/gki_defconfig
-        for cfg in \
-          CONFIG_KSU=y \
-          CONFIG_USER_NS=y \
-          CONFIG_PID_NS=y \
-          CONFIG_NET_NS=y \
-          CONFIG_MNT_NS=y \
-          CONFIG_IPC_NS=y \
-          CONFIG_UTS_NS=y \
-          CONFIG_CGROUPS=y \
-          CONFIG_CGROUP_FREEZER=y \
-          CONFIG_MEMCG=y \
-          CONFIG_FHANDLE=y \
-          CONFIG_SECCOMP=y; do
-          grep -qxF "$cfg" $CONFIG || echo "$cfg" >> $CONFIG
-        done
+        grep -qxF "CONFIG_KSU=y" $CONFIG || echo "CONFIG_KSU=y" >> $CONFIG
 
     - name: Build kernel
       run: |
