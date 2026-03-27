@@ -37,3 +37,9 @@ jobs:
         ls kernel_src/private/ 2>/dev/null || echo "no private dir"
         echo "---"
         ls kernel_src/private/google-modules/ 2>/dev/null || echo "no google-modules"
+
+    - name: Show full tree
+      run: |
+        find kernel_src/ -maxdepth 3 -name "Makefile" | head -20
+        echo "==="
+        find kernel_src/ -maxdepth 2 -name "drivers" -type d | head -10
