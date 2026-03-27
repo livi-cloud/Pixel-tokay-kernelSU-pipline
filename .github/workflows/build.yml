@@ -1,5 +1,4 @@
 name: Build Pixel 9 KernelSU
-
 on:
   push:
     branches: [ main ]
@@ -9,7 +8,6 @@ jobs:
   build:
     runs-on: ubuntu-22.04
     timeout-minutes: 360
-
     steps:
     - name: Maximize build space
       uses: easimon/maximize-build-space@master
@@ -49,30 +47,48 @@ jobs:
     - name: Integrate KernelSU v3.2.0
       run: |
         cd kernel_src/aosp
-        git clone --depth=1 --branch v3.2.0 \
+
+        # 克隆为完整 git 仓库（不用 --depth=1），保留 git 历史以便生成版本号
+        git clone --branch v3.2.0 \
           https://github.com/tiann/KernelSU.git \
-          KernelSU
-        # 建立软链接，让构建系统能找到
-        ln -sf ../KernelSU/kernel drivers/kernelsu
-        # 把 KernelSU 的 Kconfig 和 Makefile 接入内核
-        echo 'source "drivers/kernelsu/Kconfig"' >> drivers/Kconfig
-        echo 'obj-$(CONFIG_KSU) += kernelsu/' >> drivers/Makefile
+          /tmp/KernelSU
+
+        # 直接复制源码到 drivers/kernelsu（不用软链接，避免 modpost 符号问题）
+        cp -r /tmp/KernelSU/kernel drivers/kernelsu
+
+        # 接入内核 Kconfig 和 Makefile
+        grep -qxF 'source "drivers/kernelsu/Kconfig"' drivers/Kconfig \
+          || echo 'source "drivers/kernelsu/Kconfig"' >> drivers/Kconfig
+        grep -qxF 'obj-$(CONFIG_KSU) += kernelsu/' drivers/Makefile \
+          || echo 'obj-$(CONFIG_KSU) += kernelsu/' >> drivers/Makefile
+
+        # 在 drivers/kernelsu 目录内建立 git 仓库，确保 KSU_GIT_VERSION 可用
+        cd drivers/kernelsu
+        git init
+        git add -A
+        git -c user.email="ci@build" -c user.name="CI" \
+          commit -m "KernelSU v3.2.0" --quiet
+        git tag v3.2.0
 
     - name: Apply kernel config
       run: |
         cd kernel_src/aosp
-        echo "CONFIG_KSU=y" >> arch/arm64/configs/gki_defconfig
-        echo "CONFIG_USER_NS=y" >> arch/arm64/configs/gki_defconfig
-        echo "CONFIG_PID_NS=y" >> arch/arm64/configs/gki_defconfig
-        echo "CONFIG_NET_NS=y" >> arch/arm64/configs/gki_defconfig
-        echo "CONFIG_MNT_NS=y" >> arch/arm64/configs/gki_defconfig
-        echo "CONFIG_IPC_NS=y" >> arch/arm64/configs/gki_defconfig
-        echo "CONFIG_UTS_NS=y" >> arch/arm64/configs/gki_defconfig
-        echo "CONFIG_CGROUPS=y" >> arch/arm64/configs/gki_defconfig
-        echo "CONFIG_CGROUP_FREEZER=y" >> arch/arm64/configs/gki_defconfig
-        echo "CONFIG_MEMCG=y" >> arch/arm64/configs/gki_defconfig
-        echo "CONFIG_FHANDLE=y" >> arch/arm64/configs/gki_defconfig
-        echo "CONFIG_SECCOMP=y" >> arch/arm64/configs/gki_defconfig
+        CONFIG=arch/arm64/configs/gki_defconfig
+        for cfg in \
+          CONFIG_KSU=y \
+          CONFIG_USER_NS=y \
+          CONFIG_PID_NS=y \
+          CONFIG_NET_NS=y \
+          CONFIG_MNT_NS=y \
+          CONFIG_IPC_NS=y \
+          CONFIG_UTS_NS=y \
+          CONFIG_CGROUPS=y \
+          CONFIG_CGROUP_FREEZER=y \
+          CONFIG_MEMCG=y \
+          CONFIG_FHANDLE=y \
+          CONFIG_SECCOMP=y; do
+          grep -qxF "$cfg" $CONFIG || echo "$cfg" >> $CONFIG
+        done
 
     - name: Build kernel
       run: |
