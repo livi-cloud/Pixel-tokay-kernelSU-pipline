@@ -72,5 +72,7 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: pixel9-kernelsu-${{ github.sha }}
-        path: kernel_src/out/android-gs-pixel-6.1/dist/boot.img
+        path: kernel_src/out/caimito/dist/*.img
         retention-days: 7
+
+
