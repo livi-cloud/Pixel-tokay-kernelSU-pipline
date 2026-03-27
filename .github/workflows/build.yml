@@ -48,13 +48,13 @@ jobs:
 
     - name: Integrate KernelSU v3.2.0
       run: |
-        cd kernel_src/common
+        cd kernel_src/aosp          # ← 改这里
         curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/setup.sh" \
           | bash -s v3.2.0
 
     - name: Apply kernel config
       run: |
-        cd kernel_src/common
+        cd kernel_src/aosp          # ← 改这里
         echo "CONFIG_USER_NS=y" >> arch/arm64/configs/gki_defconfig
         echo "CONFIG_PID_NS=y" >> arch/arm64/configs/gki_defconfig
         echo "CONFIG_NET_NS=y" >> arch/arm64/configs/gki_defconfig
