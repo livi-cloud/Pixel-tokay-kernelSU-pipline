@@ -1,0 +1,39 @@
+
+name: Show Source Tree
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 60
+
+    steps:
+    - name: Install dependencies
+      run: |
+        sudo apt update
+        sudo apt install -y repo
+
+    - name: Sync kernel source
+      run: |
+        mkdir -p kernel_src && cd kernel_src
+        repo init \
+          -u https://android.googlesource.com/kernel/manifest \
+          -b android-gs-caimito-6.1-android16 \
+          --depth=1
+        repo sync -j$(nproc) --no-tags
+
+    - name: Show source tree
+      run: |
+        ls kernel_src/
+        echo "---"
+        ls kernel_src/common 2>/dev/null || echo "no common dir"
+  
+    - name: Show common tree
+      run: |
+        ls kernel_src/common/
+        echo "---"
+        ls kernel_src/private/ 2>/dev/null || echo "no private dir"
+        echo "---"
+        ls kernel_src/private/google-modules/ 2>/dev/null || echo "no google-modules"
